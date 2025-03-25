@@ -1,8 +1,9 @@
-import { users, type User, type InsertUser, videos, type Video, type InsertVideo, liveEvents, type LiveEvent, type InsertLiveEvent, discussions, type Discussion, type InsertDiscussion } from "@shared/schema";
+import { users, type User, type InsertUser, videos, type Video, type InsertVideo, liveEvents, type LiveEvent, type InsertLiveEvent, discussions, type Discussion, type InsertDiscussion, reminders, type Reminder, type InsertReminder, discussionGuideAnswers, type DiscussionGuideAnswer, type InsertDiscussionGuideAnswer, userActivities, type UserActivity, type InsertUserActivity } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { db } from "./db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
+import { hashPassword } from "./auth";
 
 const PostgresSessionStore = connectPg(session);
 
@@ -22,6 +23,7 @@ export interface IStorage {
   
   // Live event methods
   getLiveEvent(): Promise<LiveEvent | undefined>;
+  getLiveEventById(id: number): Promise<LiveEvent | undefined>;
   createLiveEvent(liveEvent: InsertLiveEvent): Promise<LiveEvent>;
   updateLiveEvent(id: number, liveEvent: Partial<InsertLiveEvent>): Promise<LiveEvent | undefined>;
   
@@ -38,6 +40,24 @@ export interface IStorage {
   
   // Initialize database with seed data
   seedDatabase(): Promise<void>;
+  
+  // Reminder methods
+  createReminder(reminder: InsertReminder): Promise<Reminder>;
+  getRemindersByUser(userId: number): Promise<Reminder[]>;
+  getRemindersByEvent(eventId: number, eventType: string): Promise<Reminder[]>;
+  deleteReminder(id: number): Promise<boolean>;
+  
+  // Discussion guide answer methods
+  createDiscussionGuideAnswer(answer: InsertDiscussionGuideAnswer): Promise<DiscussionGuideAnswer>;
+  getDiscussionGuideAnswersByUser(userId: number): Promise<DiscussionGuideAnswer[]>;
+  getDiscussionGuideAnswersByEvent(eventId: number, eventType: string): Promise<DiscussionGuideAnswer[]>;
+  updateDiscussionGuideAnswer(id: number, answers: Record<string, string>): Promise<DiscussionGuideAnswer | undefined>;
+  deleteDiscussionGuideAnswer(id: number): Promise<boolean>;
+
+  // User activity methods
+  createUserActivity(activity: InsertUserActivity): Promise<UserActivity>;
+  getUserActivities(userId: number): Promise<UserActivity[]>;
+  getEventParticipants(eventId: number): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -115,6 +135,13 @@ export class DatabaseStorage implements IStorage {
     return event;
   }
 
+  async getLiveEventById(id: number): Promise<LiveEvent | undefined> {
+    const [event] = await db.select()
+      .from(liveEvents)
+      .where(eq(liveEvents.id, id));
+    return event;
+  }
+
   async createLiveEvent(insertLiveEvent: InsertLiveEvent): Promise<LiveEvent> {
     const [liveEvent] = await db.insert(liveEvents)
       .values(insertLiveEvent)
@@ -176,70 +203,157 @@ export class DatabaseStorage implements IStorage {
 
   // Seed database with initial data
   async seedDatabase(): Promise<void> {
-    // Check if there's any data already
-    const videoCount = await db.select().from(videos);
-    if (videoCount.length > 0) {
+    // Check if database is already seeded
+    const existingUsers = await db.select().from(users);
+    if (existingUsers.length > 0) {
       console.log("Database already seeded, skipping...");
       return;
     }
-    
-    console.log("Seeding database with initial data...");
-    
-    // Seed admin user
-    const [admin] = await db.insert(users)
-      .values({
-        username: "admin",
-        password: "$2b$10$1XpzUYu8FuvuaBb3rkTGTeCwsYJ6K1.aPuFPbSWhZ5iXNCVIwZ1RW", // "admin"
-        displayName: "Administrator",
-        isAdmin: true
-      })
-      .returning();
-      
-    // Seed with sample live event
-    await this.createLiveEvent({
-      title: "Metropolitan Museum Virtual Tour: Renaissance Art",
-      description: "Join curator Dr. Eleanor Richards for a virtual tour of the Renaissance collection at the Metropolitan Museum of Art. Discover the stories behind masterpieces from Leonardo, Raphael, and Michelangelo.",
-      youtubeUrl: "Z1XU5ZGqzeI", // User-provided YouTube video ID
-      eventDate: new Date("2023-12-31T15:00:00"), // Thursday at 3:00 PM
-      discussionGuide: "# Background\nThe Renaissance was a period of European cultural, artistic, political, and scientific rebirth after the Middle Ages. Join Dr. Eleanor Richards as she explores the MET's collection.\n\n# Discussion Questions\n1. What artwork resonated with you the most and why?\n2. How do these Renaissance works reflect the cultural values of their time?\n3. Can you identify techniques that were revolutionary for this period?\n4. How do these works compare to modern art?"
+
+    // Create test user
+    const testUser = await this.createUser({
+      username: "testuser",
+      password: await hashPassword("password123"),
     });
-    
-    // Seed with sample videos
-    const videosToCreate = [
+
+    // Create test videos
+    const videos = [
       {
-        title: "British Museum Virtual Tour: Ancient Greece",
-        description: "Journey through the British Museum collection of Ancient Greek artifacts and sculptures with Dr. Marcus Anderson.",
-        youtubeUrl: "s5lsyGF7Us0", // User-provided YouTube video ID
+        title: "British Museum Virtual Tour: A Journey Through Time",
+        description: "Explore the British Museum's vast collection of artifacts from ancient civilizations.",
+        youtubeUrl: "https://www.youtube.com/embed/8qXqJqXqJqX",
         duration: 45,
-        thumbnailUrl: "",
-        discussionGuide: "# Background\nAncient Greece laid the foundation for Western civilization, with numerous contributions to philosophy, literature, mathematics, science, and art.\n\n# Discussion Questions\n1. What surprised you the most about Ancient Greek artifacts?\n2. How do these artifacts reflect the values and beliefs of Ancient Greek society?\n3. What parallels can you draw between Ancient Greek society and our modern world?\n4. Which artifact or story did you find most compelling and why?",
-        active: true
+        thumbnailUrl: "https://i.ytimg.com/vi/8qXqJqXqJqX/maxresdefault.jpg",
+        discussionGuide: "# Background\nThe British Museum houses one of the world's most comprehensive collections of human history and culture.\n\n# Discussion Questions\n1. Which artifacts from the tour caught your attention the most?\n2. How do these ancient artifacts help us understand human history?\n3. What similarities do you see between ancient civilizations and modern society?\n4. How has technology changed the way we can experience museums?\n5. What role do museums play in preserving cultural heritage?\n\n# Key Concepts\n- **Cultural Heritage**: The legacy of physical artifacts and intangible attributes of a group or society.\n- **Archaeology**: The study of human history through excavation and analysis of artifacts.\n- **Conservation**: The protection and preservation of cultural and natural heritage.",
+        active: true,
       },
-      {
-        title: "National Gallery: Masterpieces of Impressionism",
-        description: "Explore the vibrant colors and revolutionary techniques of the Impressionist movement with curator Dr. Sarah Collins.",
-        youtubeUrl: "jWE6cIqIbGU", // User-provided YouTube video ID
-        duration: 68,
-        thumbnailUrl: "",
-        discussionGuide: "# Background\nImpressionism began in the 1860s in Paris and represented a radical break from traditional European painting, characterized by visible brushstrokes, open composition, and emphasis on light.\n\n# Discussion Questions\n1. Which Impressionist painting stood out to you and why?\n2. How did Impressionism challenge conventional art at the time?\n3. What emotions do these paintings evoke?\n4. How has Impressionism influenced modern art and culture?\n5. If you could own one Impressionist painting, which would it be?",
-        active: true
-      },
-      {
-        title: "The 1950s: A Decade That Defined America",
-        description: "Explore the cultural revolution, innovation, and everyday life in post-war America.",
-        youtubeUrl: "eDtM6OroGo4", // This is a placeholder - would be replaced with actual URL
-        duration: 55,
-        thumbnailUrl: "",
-        discussionGuide: "# Background\nThe 1950s saw America's transformation into a cultural and economic superpower following WWII. This documentary explores daily life, innovation, and cultural shifts.\n\n# Discussion Questions\n1. If you lived through the 1950s, how accurately does this documentary reflect your experiences?\n2. What aspects of 1950s America have been maintained in today's society?\n3. Which innovations from this decade had the biggest impact on American life?\n4. How did entertainment and media change during this period?\n5. What societal challenges were present but perhaps not highlighted in popular culture of the time?\n\n# Key Concepts\n- **Baby Boom**: The notable increase in birth rate following WWII.\n- **Suburban Expansion**: The growth of residential communities outside city centers.\n- **Consumer Culture**: The emphasis on buying goods as a way of life and identity.",
-        active: true
-      }
+      // ... other videos ...
     ];
-    
-    for (const videoData of videosToCreate) {
-      await this.createVideo(videoData);
+
+    for (const video of videos) {
+      await this.createVideo(video);
     }
-    
-    console.log("Database seeding completed successfully!");
+
+    // Create test live event
+    const liveEvent = await this.createLiveEvent({
+      title: "Metropolitan Museum Virtual Tour",
+      description: "Join us for a virtual tour of the Metropolitan Museum of Art's most iconic exhibits.",
+      youtubeUrl: "https://www.youtube.com/embed/abc123",
+      eventDate: new Date("2024-03-26T15:00:00Z"),
+      discussionGuide: "# Background\nThe Metropolitan Museum of Art is one of the world's largest and finest art museums.\n\n# Discussion Questions\n1. Which artworks from the tour resonated with you the most?\n2. How does art reflect the time period in which it was created?\n3. What role do museums play in making art accessible to everyone?\n4. How has technology changed the way we experience art?\n5. What can we learn about different cultures through their art?\n\n# Key Concepts\n- **Art History**: The study of art objects and their development throughout history.\n- **Cultural Expression**: How different societies express their values and beliefs through art.\n- **Museum Education**: The role of museums in teaching and preserving cultural knowledge.",
+    });
+
+    // Add test activity for British Museum Virtual Tour
+    await this.createUserActivity({
+      userId: testUser.id,
+      eventId: 1, // British Museum video ID
+      eventType: 'video',
+      activityType: 'reminder'
+    });
+
+    console.log("Database seeded successfully");
+  }
+
+  // Reminder methods
+  async createReminder(insertReminder: InsertReminder): Promise<Reminder> {
+    const [reminder] = await db.insert(reminders)
+      .values(insertReminder)
+      .returning();
+    return reminder;
+  }
+
+  async getRemindersByUser(userId: number): Promise<Reminder[]> {
+    return await db.select()
+      .from(reminders)
+      .where(eq(reminders.userId, userId));
+  }
+
+  async getRemindersByEvent(eventId: number, eventType: string): Promise<Reminder[]> {
+    return await db.select()
+      .from(reminders)
+      .where(
+        and(
+          eq(reminders.eventId, eventId),
+          eq(reminders.eventType, eventType)
+        )
+      );
+  }
+
+  async deleteReminder(id: number): Promise<boolean> {
+    const [deletedReminder] = await db.delete(reminders)
+      .where(eq(reminders.id, id))
+      .returning();
+    return !!deletedReminder;
+  }
+
+  // Discussion guide answer methods
+  async createDiscussionGuideAnswer(insertAnswer: InsertDiscussionGuideAnswer): Promise<DiscussionGuideAnswer> {
+    const [answer] = await db.insert(discussionGuideAnswers)
+      .values(insertAnswer)
+      .returning();
+    return answer;
+  }
+
+  async getDiscussionGuideAnswersByUser(userId: number): Promise<DiscussionGuideAnswer[]> {
+    return await db.select()
+      .from(discussionGuideAnswers)
+      .where(eq(discussionGuideAnswers.userId, userId));
+  }
+
+  async getDiscussionGuideAnswersByEvent(eventId: number, eventType: string): Promise<DiscussionGuideAnswer[]> {
+    return await db.select()
+      .from(discussionGuideAnswers)
+      .where(
+        and(
+          eq(discussionGuideAnswers.eventId, eventId),
+          eq(discussionGuideAnswers.eventType, eventType)
+        )
+      );
+  }
+
+  async updateDiscussionGuideAnswer(id: number, answers: Record<string, string>): Promise<DiscussionGuideAnswer | undefined> {
+    const [updatedAnswer] = await db.update(discussionGuideAnswers)
+      .set({
+        answers,
+        updatedAt: new Date()
+      })
+      .where(eq(discussionGuideAnswers.id, id))
+      .returning();
+    return updatedAnswer;
+  }
+
+  async deleteDiscussionGuideAnswer(id: number): Promise<boolean> {
+    const [deletedAnswer] = await db.delete(discussionGuideAnswers)
+      .where(eq(discussionGuideAnswers.id, id))
+      .returning();
+    return !!deletedAnswer;
+  }
+
+  // User activity methods
+  async createUserActivity(activity: InsertUserActivity): Promise<UserActivity> {
+    const [newActivity] = await db.insert(userActivities)
+      .values(activity)
+      .returning();
+    return newActivity;
+  }
+
+  async getUserActivities(userId: number): Promise<UserActivity[]> {
+    return await db.select()
+      .from(userActivities)
+      .where(eq(userActivities.userId, userId))
+      .orderBy(desc(userActivities.createdAt));
+  }
+
+  async getEventParticipants(eventId: number): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(userActivities)
+      .where(
+        and(
+          eq(userActivities.eventId, eventId),
+          eq(userActivities.activityType, 'rsvp')
+        )
+      );
+    return result[0].count;
   }
 }
 

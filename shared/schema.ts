@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -62,6 +62,54 @@ export const insertDiscussionSchema = createInsertSchema(discussions).omit({
   id: true,
 });
 
+// Reminders table
+export const reminders = pgTable("reminders", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  eventId: integer("event_id").notNull(),
+  eventType: text("event_type").notNull(), // 'live' or 'video'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  notified: boolean("notified").default(false).notNull(),
+});
+
+export const insertReminderSchema = createInsertSchema(reminders).omit({
+  id: true,
+  createdAt: true,
+  notified: true,
+});
+
+// Discussion guide answers table
+export const discussionGuideAnswers = pgTable("discussion_guide_answers", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  eventId: integer("event_id").notNull(),
+  eventType: text("event_type").notNull(), // 'live' or 'video'
+  answers: jsonb("answers").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertDiscussionGuideAnswerSchema = createInsertSchema(discussionGuideAnswers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// User activity table
+export const userActivities = pgTable("user_activities", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  eventId: integer("event_id").notNull(),
+  eventType: text("event_type").notNull(), // 'live' or 'video'
+  activityType: text("activity_type").notNull(), // 'rsvp' or 'reminder'
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertUserActivitySchema = createInsertSchema(userActivities).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -74,3 +122,12 @@ export type Video = typeof videos.$inferSelect;
 
 export type InsertDiscussion = z.infer<typeof insertDiscussionSchema>;
 export type Discussion = typeof discussions.$inferSelect;
+
+export type InsertReminder = z.infer<typeof insertReminderSchema>;
+export type Reminder = typeof reminders.$inferSelect;
+
+export type InsertDiscussionGuideAnswer = z.infer<typeof insertDiscussionGuideAnswerSchema>;
+export type DiscussionGuideAnswer = typeof discussionGuideAnswers.$inferSelect;
+
+export type InsertUserActivity = z.infer<typeof insertUserActivitySchema>;
+export type UserActivity = typeof userActivities.$inferSelect;

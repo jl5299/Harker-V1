@@ -30,22 +30,16 @@ export default function Header() {
         
         <div className="hidden md:flex items-center space-x-8">
           <Link 
-            href="/" 
-            className={`text-xl font-semibold hover:text-primary transition-colors duration-200 ${isActive("/") && "text-primary"}`}
+            href="/live-events" 
+            className={`text-xl font-semibold hover:text-primary transition-colors duration-200 ${isActive("/live-events") && "text-primary"}`}
           >
             Live Events
           </Link>
           <Link 
-            href="/#on-demand" 
-            className="text-xl font-semibold hover:text-primary transition-colors duration-200"
+            href="/on-demand" 
+            className={`text-xl font-semibold hover:text-primary transition-colors duration-200 ${isActive("/on-demand") && "text-primary"}`}
           >
             On-Demand
-          </Link>
-          <Link 
-            href="/discussions" 
-            className={`text-xl font-semibold hover:text-primary transition-colors duration-200 ${isActive("/discussions") && "text-primary"}`}
-          >
-            Discussions
           </Link>
           
           {user ? (
@@ -69,6 +63,9 @@ export default function Header() {
                     <Link href="/admin">Admin Dashboard</Link>
                   </DropdownMenuItem>
                 )}
+                <DropdownMenuItem asChild>
+                  <Link href="/activity">Your Activity</Link>
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => logoutMutation.mutate()}
                   className="text-red-600 cursor-pointer"
@@ -99,28 +96,21 @@ export default function Header() {
       </div>
       
       {/* Mobile Menu */}
-      {mobileMenuOpen && (
-        <div className="md:hidden bg-white mt-2 py-2 px-6">
+      <div className={`md:hidden ${mobileMenuOpen ? 'block' : 'hidden'} absolute top-full left-0 right-0 bg-white shadow-lg z-50`}>
+        <div className="container mx-auto px-6 py-4">
           <Link 
-            href="/" 
-            className="block py-4 text-xl font-semibold"
+            href="/live-events" 
+            className={`block py-4 text-xl font-semibold ${isActive("/live-events") && "text-primary"}`}
             onClick={() => setMobileMenuOpen(false)}
           >
             Live Events
           </Link>
           <Link 
-            href="/#on-demand" 
-            className="block py-4 text-xl font-semibold"
+            href="/on-demand" 
+            className={`block py-4 text-xl font-semibold ${isActive("/on-demand") && "text-primary"}`}
             onClick={() => setMobileMenuOpen(false)}
           >
             On-Demand
-          </Link>
-          <Link 
-            href="/discussions" 
-            className="block py-4 text-xl font-semibold"
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            Discussions
           </Link>
           
           {user ? (
@@ -137,6 +127,13 @@ export default function Header() {
                   Admin Dashboard
                 </Link>
               )}
+              <Link 
+                href="/activity" 
+                className="block py-4 text-xl font-semibold"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Your Activity
+              </Link>
               <button 
                 onClick={() => {
                   logoutMutation.mutate();
@@ -157,7 +154,7 @@ export default function Header() {
             </Link>
           )}
         </div>
-      )}
+      </div>
     </header>
   );
 }

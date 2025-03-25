@@ -12,16 +12,22 @@ import DiscussionPage from "@/pages/discussion-page";
 import AuthPage from "@/pages/auth-page";
 import AdminPage from "@/pages/admin-page";
 import DiscussionsPage from "@/pages/discussions-page";
+import UserActivityPage from "@/pages/user-activity-page";
+import LiveEventsPage from "@/pages/live-events-page";
+import OnDemandPage from "@/pages/on-demand-page";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={HomePage} />
+      <Route path="/live-events" component={LiveEventsPage} />
+      <Route path="/on-demand" component={OnDemandPage} />
       <Route path="/video/:id" component={VideoPage} />
       <ProtectedRoute path="/discussion/:id" component={DiscussionPage} />
       <Route path="/auth" component={AuthPage} />
       <ProtectedRoute path="/admin" component={AdminPage} adminOnly={true} />
       <Route path="/discussions" component={DiscussionsPage} />
+      <ProtectedRoute path="/activity" component={UserActivityPage} />
       <Route component={NotFound} />
     </Switch>
   );

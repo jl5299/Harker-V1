@@ -20,6 +20,7 @@ export interface IStorage {
   
   // Live event methods
   getLiveEvent(): Promise<LiveEvent | undefined>;
+  getLiveEventById(id: number): Promise<LiveEvent | undefined>;
   createLiveEvent(liveEvent: InsertLiveEvent): Promise<LiveEvent>;
   updateLiveEvent(id: number, liveEvent: Partial<InsertLiveEvent>): Promise<LiveEvent | undefined>;
   
@@ -175,6 +176,10 @@ export class MemStorage implements IStorage {
     // Sort by date (newest first)
     events.sort((a, b) => b.eventDate.getTime() - a.eventDate.getTime());
     return events[0];
+  }
+
+  async getLiveEventById(id: number): Promise<LiveEvent | undefined> {
+    return this.liveEvents.get(id);
   }
 
   async createLiveEvent(insertLiveEvent: InsertLiveEvent): Promise<LiveEvent> {

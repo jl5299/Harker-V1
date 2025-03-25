@@ -4,7 +4,7 @@ import { storage } from "./database-storage";
 import { setupAuth } from "./auth";
 import { transcribeAudio } from "./audio";
 import { z } from "zod";
-import { insertDiscussionSchema, insertLiveEventSchema, insertVideoSchema } from "@shared/schema";
+import { insertDiscussionSchema, insertLiveEventSchema, insertVideoSchema, insertReminderSchema, insertDiscussionGuideAnswerSchema, insertUserActivitySchema } from "@shared/schema";
 
 // Middleware to check if user is admin
 const isAdmin = (req: Request, res: Response, next: Function) => {
@@ -115,6 +115,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "No live event found" });
       }
       res.json(liveEvent);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch live event" });
+    }
+  });
+  
+  app.get("/api/live-events/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const event = await storage.getLiveEventById(id);
+      
+      if (!event) {
+        return res.status(404).json({ message: "Live event not found" });
+      }
+      
+      res.json(event);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch live event" });
     }
@@ -244,6 +259,145 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Transcription error:", error);
       res.status(500).json({ message: "Failed to transcribe audio" });
+    }
+  });
+  
+  // Reminder routes
+  app.post("/api/reminders", isAuthenticated, async (req, res) => {
+    try {
+      const validatedData = insertReminderSchema.parse({
+        ...req.body,
+        userId: req.user!.id
+      });
+      const reminder = await storage.createReminder(validatedData);
+      res.status(201).json(reminder);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid reminder data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create reminder" });
+    }
+  });
+
+  app.get("/api/reminders", isAuthenticated, async (req, res) => {
+    try {
+      const reminders = await storage.getRemindersByUser(req.user!.id);
+      res.json(reminders);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch reminders" });
+    }
+  });
+
+  app.delete("/api/reminders/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const success = await storage.deleteReminder(id);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Reminder not found" });
+      }
+      
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete reminder" });
+    }
+  });
+
+  // Discussion guide answer routes
+  app.post("/api/discussion-answers", isAuthenticated, async (req, res) => {
+    try {
+      const validatedData = insertDiscussionGuideAnswerSchema.parse({
+        ...req.body,
+        userId: req.user!.id
+      });
+      const answer = await storage.createDiscussionGuideAnswer(validatedData);
+      res.status(201).json(answer);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid answer data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to submit answers" });
+    }
+  });
+
+  app.get("/api/discussion-answers", isAuthenticated, async (req, res) => {
+    try {
+      const answers = await storage.getDiscussionGuideAnswersByUser(req.user!.id);
+      res.json(answers);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch answers" });
+    }
+  });
+
+  app.put("/api/discussion-answers/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const answers = req.body.answers;
+      
+      if (!answers || typeof answers !== 'object') {
+        return res.status(400).json({ message: "Invalid answers data" });
+      }
+      
+      const updatedAnswer = await storage.updateDiscussionGuideAnswer(id, answers);
+      
+      if (!updatedAnswer) {
+        return res.status(404).json({ message: "Answer not found" });
+      }
+      
+      res.json(updatedAnswer);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update answers" });
+    }
+  });
+
+  app.delete("/api/discussion-answers/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const success = await storage.deleteDiscussionGuideAnswer(id);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Answer not found" });
+      }
+      
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete answer" });
+    }
+  });
+  
+  // User activity routes
+  app.post("/api/user-activities", isAuthenticated, async (req, res) => {
+    try {
+      const validatedData = insertUserActivitySchema.parse({
+        ...req.body,
+        userId: req.user!.id
+      });
+      const activity = await storage.createUserActivity(validatedData);
+      res.status(201).json(activity);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid activity data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create activity" });
+    }
+  });
+
+  app.get("/api/user-activities", isAuthenticated, async (req, res) => {
+    try {
+      const activities = await storage.getUserActivities(req.user!.id);
+      res.json(activities);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch user activities" });
+    }
+  });
+
+  app.get("/api/events/:id/participants", async (req, res) => {
+    try {
+      const eventId = Number(req.params.id);
+      const count = await storage.getEventParticipants(eventId);
+      res.json({ count });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch participant count" });
     }
   });
   
