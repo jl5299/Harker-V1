@@ -5,17 +5,34 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Discussion, Video } from "@shared/schema";
 import Header from "@/components/header";
 import Footer from "@/components/footer";
 import { Search, ArrowRight } from "lucide-react";
 import { format } from "date-fns";
 
+// Define types that were imported from @shared/schema
+interface Discussion {
+  id: number;
+  title: string;
+  transcription: string;
+  date: string | Date;
+  videoId: number;
+  participants: number;
+}
+
+interface Video {
+  id: number;
+  title: string;
+  description: string;
+  youtubeUrl: string;
+  duration?: number;
+}
+
 export default function DiscussionsPage() {
-  const [, navigate] = useLocation();
+  const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
-  const [videoFilter, setVideoFilter] = useState("");
-  const [dateFilter, setDateFilter] = useState("");
+  const [videoFilter, setVideoFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState("all");
 
   // Fetch all discussions
   const { data: discussions, isLoading: loadingDiscussions } = useQuery<Discussion[]>({
@@ -35,11 +52,11 @@ export default function DiscussionsPage() {
       discussion.transcription.toLowerCase().includes(searchTerm.toLowerCase());
     
     // Filter by video
-    const matchesVideo = !videoFilter || discussion.videoId === parseInt(videoFilter);
+    const matchesVideo = videoFilter === "all" || discussion.videoId === parseInt(videoFilter);
     
     // Filter by date
     let matchesDate = true;
-    if (dateFilter) {
+    if (dateFilter !== "all") {
       const discussionDate = new Date(discussion.date);
       const now = new Date();
       if (dateFilter === "last-week") {
@@ -91,7 +108,7 @@ export default function DiscussionsPage() {
                   <SelectValue placeholder="All Videos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Videos</SelectItem>
+                  <SelectItem value="all">All Videos</SelectItem>
                   {videos?.map((video) => (
                     <SelectItem key={video.id} value={video.id.toString()}>
                       {video.title}
@@ -104,7 +121,7 @@ export default function DiscussionsPage() {
                   <SelectValue placeholder="All Dates" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Dates</SelectItem>
+                  <SelectItem value="all">All Dates</SelectItem>
                   <SelectItem value="last-week">Last Week</SelectItem>
                   <SelectItem value="last-month">Last Month</SelectItem>
                   <SelectItem value="last-3-months">Last 3 Months</SelectItem>

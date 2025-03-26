@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { LiveEvent } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CalendarIcon, Bell } from "lucide-react";
@@ -15,8 +14,18 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { useAuth } from "@/lib/auth-provider";
+import { useAuth } from "@/contexts/auth-context";
 import { useLocation } from "wouter";
+
+// Local interface to replace the imported one
+interface LiveEvent {
+  id: number;
+  title: string;
+  description: string;
+  eventDate: Date;
+  youtubeUrl?: string;
+  imageUrl?: string;
+}
 
 async function fetchLatestLiveEvent() {
   const response = await fetch('/api/live-events');
@@ -31,7 +40,7 @@ export default function LiveEventsPage() {
   const { user } = useAuth();
   const [showReminderDialog, setShowReminderDialog] = useState(false);
   const [showRSVPDialog, setShowRSVPDialog] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
 
   const { data: liveEvent, isLoading } = useQuery<LiveEvent>({
     queryKey: ["/api/live-events"],

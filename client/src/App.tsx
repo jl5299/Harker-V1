@@ -1,47 +1,77 @@
-import { Switch, Route } from "wouter";
-import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
-import { AuthProvider } from "./lib/auth-provider";
-import { ProtectedRoute } from "./lib/protected-route";
+import { Route, Switch, Redirect } from "wouter";
+import { AuthProvider } from "./contexts/auth-context";
+import { AuthPage } from "./pages/auth-page";
+import { ProtectedRoute } from "./components/protected-route";
+import { SettingsPage } from "./pages/settings-page";
+import { Toaster } from "./components/ui/toaster";
+import LiveEventsPage from "./pages/live-events-page";
+import OnDemandPage from "./pages/on-demand-page";
+import DiscussionsPage from "./pages/discussions-page";
+import HomePage from "./pages/home-page";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useAuth } from "./contexts/auth-context";
 
-import NotFound from "@/pages/not-found";
-import HomePage from "@/pages/home-page";
-import VideoPage from "@/pages/video-page";
-import DiscussionPage from "@/pages/discussion-page";
-import AuthPage from "@/pages/auth-page";
-import AdminPage from "@/pages/admin-page";
-import DiscussionsPage from "@/pages/discussions-page";
-import UserActivityPage from "@/pages/user-activity-page";
-import LiveEventsPage from "@/pages/live-events-page";
-import OnDemandPage from "@/pages/on-demand-page";
+console.log('App component rendering');
 
-function Router() {
+// Create a client
+const queryClient = new QueryClient();
+
+// Root route that redirects based on auth status
+function RootRoute() {
+  const { user, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-lg">Loading...</div>
+      </div>
+    );
+  }
+  
+  if (!user) {
+    return <Redirect to="/auth" />;
+  }
+  
+  return <HomePage />;
+}
+
+function AppRoutes() {
+  console.log('AppRoutes component rendering');
   return (
     <Switch>
-      <Route path="/" component={HomePage} />
-      <Route path="/live-events" component={LiveEventsPage} />
-      <Route path="/on-demand" component={OnDemandPage} />
-      <Route path="/video/:id" component={VideoPage} />
-      <ProtectedRoute path="/discussion/:id" component={DiscussionPage} />
-      <Route path="/auth" component={AuthPage} />
-      <ProtectedRoute path="/admin" component={AdminPage} adminOnly={true} />
-      <Route path="/discussions" component={DiscussionsPage} />
-      <ProtectedRoute path="/activity" component={UserActivityPage} />
-      <Route component={NotFound} />
+      <Route path="/auth">
+        <AuthPage />
+      </Route>
+      <ProtectedRoute path="/home-page">
+        <HomePage />
+      </ProtectedRoute>
+      <ProtectedRoute path="/settings">
+        <SettingsPage />
+      </ProtectedRoute>
+      <ProtectedRoute path="/live-events-page">
+        <LiveEventsPage />
+      </ProtectedRoute>
+      <ProtectedRoute path="/on-demand-page">
+        <OnDemandPage />
+      </ProtectedRoute>
+      <ProtectedRoute path="/discussions-page">
+        <DiscussionsPage />
+      </ProtectedRoute>
+      <Route path="/">
+        <RootRoute />
+      </Route>
     </Switch>
   );
 }
 
-function App() {
+export default function App() {
+  console.log('App component mounting');
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Router />
+        <AppRoutes />
         <Toaster />
       </AuthProvider>
     </QueryClientProvider>
   );
 }
-
-export default App;

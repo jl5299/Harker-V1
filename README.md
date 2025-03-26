@@ -33,7 +33,8 @@ Harker is a video streaming platform specifically designed for senior communitie
 The application requires the following environment variables:
 
 ```
-DATABASE_URL=your_postgres_connection_string
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_SERVICE_KEY=your_supabase_project_service_key
 OPENAI_API_KEY=your_openai_api_key (optional, for transcription features)
 ```
 
@@ -41,8 +42,8 @@ OPENAI_API_KEY=your_openai_api_key (optional, for transcription features)
 
 1. Clone the repository
 2. Install dependencies: `npm install`
-3. Run database migrations: `npm run db:push`
-4. Start the application: `npm run dev`
+3. Run the client and server: `npm run dev:all`
+4. Access the client application at `http://localhost:5173/`
 
 ## Project Structure
 

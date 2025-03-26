@@ -1,75 +1,56 @@
-import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
-import { storage } from "./database-storage";
+import express from "express";
+import cors from "cors";
+import { createClient } from "@supabase/supabase-js";
+import { config } from "./config";
 
 const app = express();
+
+// Initialize Supabase client
+const supabase = createClient(config.supabaseUrl, config.supabaseServiceKey);
+
+// Middleware
+app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
 
+// Logging middleware
 app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
-
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      log(logLine);
-    }
-  });
-
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
   next();
 });
 
-(async () => {
-  // Initialize database with seed data
+// Authentication middleware
+app.use(async (req, res, next) => {
   try {
-    await storage.seedDatabase();
-    log("Database initialized successfully");
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) {
+      return res.status(401).json({ message: "No token provided" });
+    }
+
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (error || !user) {
+      return res.status(401).json({ message: "Invalid token" });
+    }
+
+    // Add user to request object
+    (req as any).user = user;
+    next();
   } catch (error) {
-    console.error("Failed to initialize database:", error);
+    res.status(500).json({ message: "Failed to verify authentication" });
   }
+});
 
-  const server = await registerRoutes(app);
+// Basic health check endpoint
+app.get("/health", (req, res) => {
+  res.json({ status: "ok" });
+});
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+// Error handling middleware
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error(err.stack);
+  res.status(500).json({ message: "Something went wrong!" });
+});
 
-    res.status(status).json({ message });
-    throw err;
-  });
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
-
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = 5000;
-  server.listen(port, 'localhost', () => {
-    log(`serving on port ${port}`);
-  });
-})();
+// Start server
+app.listen(config.port, () => {
+  console.log(`Server running on port ${config.port}`);
+});

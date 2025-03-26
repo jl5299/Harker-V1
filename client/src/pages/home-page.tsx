@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { LiveEvent, Video } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { CalendarIcon, FileText, Bell } from "lucide-react";
+import { Bell, CalendarIcon } from "lucide-react";
 import { YouTubePreview } from "@/components/ui/youtube-embed";
 import Header from "@/components/header";
 import Footer from "@/components/footer";
@@ -16,7 +15,27 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useAuth } from "@/lib/auth-provider";
+import { useAuth } from "@/contexts/auth-context";
+
+// Define types that were imported from @shared/schema
+interface LiveEvent {
+  id: number;
+  title: string;
+  description: string;
+  eventDate: Date;
+  youtubeUrl?: string;
+  imageUrl?: string;
+}
+
+interface Video {
+  id: number;
+  title: string;
+  description: string;
+  youtubeUrl: string;
+  duration?: number;
+  createdAt?: Date;
+  thumbnailUrl?: string;
+}
 
 async function fetchLatestLiveEvent() {
   const response = await fetch('/api/live-events');
@@ -30,7 +49,7 @@ export default function HomePage() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const [showReminderDialog, setShowReminderDialog] = useState(false);
-  const [reminderError, setReminderError] = useState<string | null>(null);
+  const [, setReminderError] = useState<string | null>(null);
 
   // Fetch live event
   const { data: liveEvent, isLoading: isLoadingLiveEvent } = useQuery<LiveEvent>({

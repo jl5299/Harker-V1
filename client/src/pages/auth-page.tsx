@@ -1,187 +1,174 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useAuth } from "@/lib/auth-provider";
-import { insertUserSchema } from "@shared/schema";
-import { useLocation } from "wouter";
-import Header from "@/components/header";
-import Footer from "@/components/footer";
+import { useAuth } from "../contexts/auth-context";
+import { Button } from "../components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "../components/ui/form";
+import { Input } from "../components/ui/input";
+// import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { Layout } from "../components/layout";
+import { useToast } from "@/components/ui/use-toast";
 
-// Extend the insert schema with validation
-const loginSchema = insertUserSchema.extend({
+const authSchema = z.object({
+  email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
-const registerSchema = insertUserSchema.extend({
-  password: z.string().min(6, "Password must be at least 6 characters"),
-  confirmPassword: z.string().min(6, "Password must be at least 6 characters"),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords do not match",
-  path: ["confirmPassword"],
-});
+type AuthFormData = z.infer<typeof authSchema>;
 
-export default function AuthPage() {
-  const [activeTab, setActiveTab] = useState<"login" | "register">("login");
-  const { loginMutation, registerMutation, user } = useAuth();
-  const [location, navigate] = useLocation();
+const defaultValues: AuthFormData = {
+  email: "",
+  password: "",
+};
 
-  // Redirect if already logged in
+export function AuthPage() {
+  const [, setLocation] = useLocation();
+  const { signIn, user } = useAuth();
+  const { toast } = useToast();
+  // const [isSignUp, setIsSignUp] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const form = useForm<AuthFormData>({
+    resolver: zodResolver(authSchema),
+    defaultValues,
+  });
+
+  const onSubmit = async (values: AuthFormData) => {
+    try {
+      setIsSubmitting(true);
+      setFormError(null);
+      console.log('Attempting to sign in with:', values.email);
+      
+      await signIn(values.email, values.password);
+      
+      console.log('Sign in successful');
+      toast({
+        title: "Success",
+        description: "You have been signed in successfully.",
+      });
+      
+      // Add a small delay to ensure the user state is updated
+      setTimeout(() => {
+        setLocation("/home-page");
+      }, 100);
+    } catch (error) {
+      console.error('Sign in error:', error);
+      const errorMessage = error instanceof Error ? error.message : "An error occurred during sign in";
+      setFormError(errorMessage);
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Redirect if already signed in
   if (user) {
-    navigate("/");
+    setLocation("/home-page");
     return null;
   }
 
-  // Login form
-  const loginForm = useForm<z.infer<typeof loginSchema>>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: {
-      username: "",
-      password: "",
-    },
-  });
-
-  // Register form
-  const registerForm = useForm<z.infer<typeof registerSchema>>({
-    resolver: zodResolver(registerSchema),
-    defaultValues: {
-      username: "",
-      password: "",
-      confirmPassword: "",
-    },
-  });
-
-  // Submit handlers
-  const onLoginSubmit = (values: z.infer<typeof loginSchema>) => {
-    loginMutation.mutate(values);
-  };
-
-  const onRegisterSubmit = (values: z.infer<typeof registerSchema>) => {
-    const { confirmPassword, ...userData } = values;
-    registerMutation.mutate(userData);
-  };
-
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
-      <Header />
-      
-      <main className="container mx-auto px-6 py-12 flex-grow">
+    <Layout>
+      <div className="container mx-auto px-6 py-12">
         <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
           {/* Auth Form */}
           <Card className="shadow-lg">
             <CardHeader>
               <CardTitle className="text-3xl font-bold">Welcome to Harker</CardTitle>
               <CardDescription className="text-lg">
-                Sign in or create an account to access all features
+                Sign in to access all features
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Tabs defaultValue="login" value={activeTab} onValueChange={(v) => setActiveTab(v as "login" | "register")}>
+              {/* <Tabs defaultValue="login" value={isSignUp ? "register" : "login"} onValueChange={(v) => setIsSignUp(v === "register")}>
                 <TabsList className="grid w-full grid-cols-2 mb-8">
                   <TabsTrigger value="login" className="text-lg py-3">Login</TabsTrigger>
                   <TabsTrigger value="register" className="text-lg py-3">Register</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="login">
-                  <Form {...loginForm}>
-                    <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-6">
-                      <FormField
-                        control={loginForm.control}
-                        name="username"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-lg">Username</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Enter your username" className="text-lg py-6" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={loginForm.control}
-                        name="password"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-lg">Password</FormLabel>
-                            <FormControl>
-                              <Input type="password" placeholder="Enter your password" className="text-lg py-6" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <Button 
-                        type="submit" 
-                        size="lg" 
-                        className="w-full text-lg py-6" 
-                        disabled={loginMutation.isPending}
-                      >
-                        {loginMutation.isPending ? "Signing in..." : "Sign In"}
-                      </Button>
-                    </form>
-                  </Form>
-                </TabsContent>
-                
-                <TabsContent value="register">
-                  <Form {...registerForm}>
-                    <form onSubmit={registerForm.handleSubmit(onRegisterSubmit)} className="space-y-6">
-                      <FormField
-                        control={registerForm.control}
-                        name="username"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-lg">Username</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Choose a username" className="text-lg py-6" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={registerForm.control}
-                        name="password"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-lg">Password</FormLabel>
-                            <FormControl>
-                              <Input type="password" placeholder="Create a password" className="text-lg py-6" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={registerForm.control}
-                        name="confirmPassword"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-lg">Confirm Password</FormLabel>
-                            <FormControl>
-                              <Input type="password" placeholder="Confirm your password" className="text-lg py-6" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <Button 
-                        type="submit" 
-                        size="lg" 
-                        className="w-full text-lg py-6" 
-                        disabled={registerMutation.isPending}
-                      >
-                        {registerMutation.isPending ? "Creating Account..." : "Create Account"}
-                      </Button>
-                    </form>
-                  </Form>
-                </TabsContent>
-              </Tabs>
+                </TabsList> */}
+              
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-lg">Email</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="Enter your email" className="text-lg py-6" {...field} disabled={isSubmitting} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-lg">Password</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="Enter your password" className="text-lg py-6" {...field} disabled={isSubmitting} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  {formError && (
+                    <div className="text-red-500 text-sm">{formError}</div>
+                  )}
+                  <Button type="submit" className="w-full text-lg py-6" disabled={isSubmitting}>
+                    {isSubmitting ? "Signing in..." : "Sign In"}
+                  </Button>
+                </form>
+              </Form>
+
+              {/* <TabsContent value="register">
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-lg">Email</FormLabel>
+                          <FormControl>
+                            <Input type="email" placeholder="Enter your email" className="text-lg py-6" {...field} disabled={isSubmitting} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-lg">Password</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="Enter your password" className="text-lg py-6" {...field} disabled={isSubmitting} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    {formError && (
+                      <div className="text-red-500 text-sm">{formError}</div>
+                    )}
+                    <Button type="submit" className="w-full text-lg py-6" disabled={isSubmitting}>
+                      {isSubmitting ? "Creating account..." : "Create Account"}
+                    </Button>
+                  </form>
+                </Form>
+              </TabsContent> */}
             </CardContent>
           </Card>
           
@@ -219,9 +206,7 @@ export default function AuthPage() {
             </ul>
           </div>
         </div>
-      </main>
-      
-      <Footer />
-    </div>
+      </div>
+    </Layout>
   );
 }

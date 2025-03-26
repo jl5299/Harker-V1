@@ -4,7 +4,7 @@ import { z } from "zod";
 
 // Users table
 export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
+  id: text("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   isAdmin: boolean("is_admin").default(false).notNull(),
@@ -65,49 +65,43 @@ export const insertDiscussionSchema = createInsertSchema(discussions).omit({
 // Reminders table
 export const reminders = pgTable("reminders", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id),
+  userId: text("user_id").notNull().references(() => users.id),
   eventId: integer("event_id").notNull(),
-  eventType: text("event_type").notNull(), // 'live' or 'video'
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  notified: boolean("notified").default(false).notNull(),
+  eventType: text("event_type").notNull(),
+  reminderDate: timestamp("reminder_date").notNull(),
 });
 
 export const insertReminderSchema = createInsertSchema(reminders).omit({
   id: true,
-  createdAt: true,
-  notified: true,
+  reminderDate: true,
 });
 
 // Discussion guide answers table
 export const discussionGuideAnswers = pgTable("discussion_guide_answers", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id),
+  userId: text("user_id").notNull().references(() => users.id),
   eventId: integer("event_id").notNull(),
-  eventType: text("event_type").notNull(), // 'live' or 'video'
+  eventType: text("event_type").notNull(),
   answers: jsonb("answers").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const insertDiscussionGuideAnswerSchema = createInsertSchema(discussionGuideAnswers).omit({
   id: true,
-  createdAt: true,
-  updatedAt: true,
 });
 
 // User activity table
 export const userActivities = pgTable("user_activities", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id),
+  userId: text("user_id").notNull().references(() => users.id),
   eventId: integer("event_id").notNull(),
-  eventType: text("event_type").notNull(), // 'live' or 'video'
-  activityType: text("activity_type").notNull(), // 'rsvp' or 'reminder'
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  eventType: text("event_type").notNull(),
+  activityType: text("activity_type").notNull(),
+  timestamp: timestamp("timestamp").notNull(),
 });
 
 export const insertUserActivitySchema = createInsertSchema(userActivities).omit({
   id: true,
-  createdAt: true,
+  timestamp: true,
 });
 
 // Types
