@@ -29,7 +29,7 @@ interface Video {
 }
 
 export default function DiscussionsPage() {
-  const [, setLocation] = useLocation();
+  const [] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [videoFilter, setVideoFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");

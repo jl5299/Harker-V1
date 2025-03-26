@@ -1,16 +1,45 @@
 import { useQuery } from "@tanstack/react-query";
-import { Video } from "@shared/schema";
 import { Card } from "@/components/ui/card";
 import { YouTubePreview } from "@/components/ui/youtube-embed";
 import Header from "@/components/header";
 import Footer from "@/components/footer";
 import { useLocation } from "wouter";
+import { supabase } from "@/lib/supabase";
+
+// Define Video interface to match Supabase table
+interface Video {
+  id: number;
+  title: string;
+  description: string | null;
+  youtubeurl: string;
+  duration: number | null;
+  thumbnailurl: string | null;
+  createdat: string;
+  updatedat: string;
+  ispublished: boolean;
+  orderindex: number;
+  category: string | null;
+  tags: string[] | null;
+}
 
 export default function OnDemandPage() {
   const [, setLocation] = useLocation();
 
   const { data: videos, isLoading } = useQuery<Video[]>({
     queryKey: ["/api/videos"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('on_demand_videos')
+        .select('*')
+        .eq('ispublished', true)
+        .order('orderindex', { ascending: true });
+
+      if (error) {
+        throw error;
+      }
+
+      return data;
+    }
   });
 
   return (
@@ -39,9 +68,9 @@ export default function OnDemandPage() {
             {videos.map((video) => (
               <Card key={video.id} className="overflow-hidden">
                 <YouTubePreview 
-                  videoId={video.youtubeUrl} 
+                  videoId={video.youtubeurl} 
                   title={video.title}
-                  description={video.description}
+                  description={video.description ?? ''}
                   duration={video.duration ?? undefined}
                   onClick={() => {
                     if (video.id) {
